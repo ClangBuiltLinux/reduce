@@ -23,9 +23,8 @@ def error(msg: str) -> None:
 
 def warn(msg: str, ret_only: bool = False) -> str:
     msg = f"{Colors.WARNING}[WARNING]{Colors.ENDC} {msg}"
-    if ret_only:
-        return msg
-    print(msg)
+    if not ret_only:
+        print(msg)
     return msg
 
 
