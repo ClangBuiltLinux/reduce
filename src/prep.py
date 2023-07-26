@@ -45,9 +45,11 @@ def make_dot_i_file(
     path_to_linux: Path,
     output_dir: Path,
     force_rm_existing_target: bool,
-) -> str:
+) -> tuple[Path, str]:
     """
     Make the preprocessed .i file which can then be compiled sans build system
+
+    Returns the path to the .i file as well as the stdout from `make`
     """
 
     if (abs_target := path_to_linux / target).exists():
@@ -61,12 +63,31 @@ def make_dot_i_file(
     )
     ic(make_output)
 
+    destination = output_dir / target.name
     if make_output.returncode == 0:
         info(f"Moving generated {target} file to {output_dir}")
-        shutil.move(path_to_linux / target, output_dir / target.name)
+        shutil.move(path_to_linux / target, destination)
         success(f"Successfully generated {target.name}")
 
-    return make_output.stdout.decode("utf-8")
+    return (destination, make_output.stdout.decode("utf-8"))
+
+
+def cleanup_dot_i_file(path: Path) -> None:
+    """
+    Remove preprocessor-specific lines to speed up reductions
+
+    Got some tips from here:
+    https://gcc.gnu.org/wiki/A_guide_to_testcase_reduction
+
+    The overhead of this function is worth it. Reductions are sped up greatly.
+    """
+    info(f"Cleaning up {path.name} file for reduction")
+    preprocess_pattern = r"^# .*$"
+
+    file_raw = path.read_text()
+    file_raw = re.sub(preprocess_pattern, "", file_raw, flags=re.MULTILINE)
+
+    path.write_text(file_raw)
 
 
 def get_compiler_invocation(target: Path, make_stdout: str) -> Command:
@@ -105,6 +126,34 @@ def clean_compiler_invocation(cc_invocation: Command) -> Command:
     return cleaned
 
 
+def cc_invocation_to_flags(cc_invocation: Command) -> str:
+    """
+    Accepts a full cc_invocation command and parses out just the flags
+
+    The order of the pop()'s are important as the relative index of items
+    changes as items are removed
+    """
+    cc_flags = cc_invocation[1:].copy()  # ditch the `clang` or `gcc` invocation
+
+    dash_o_idx = cc_flags.index("-o")
+    cc_flags.pop(dash_o_idx + 1)  # remove target.o
+    cc_flags.pop(dash_o_idx)  # remove -o
+
+    dash_c_idx = cc_flags.index("-c")
+    cc_flags.pop(dash_c_idx + 1)  # remove target.c
+    cc_flags.pop(dash_c_idx)  # remove -c
+
+    return "\n".join([str(x) for x in cc_flags])  # cast is necessary for Paths
+
+
+def write_flags_txt(cc_flags: str, file_location: Path) -> None:
+    """
+    Writes compiler flags to a file specified by file_location
+    """
+    file_location.write_text(cc_flags)
+    success(f"Wrote {file_location.name}")
+
+
 def write_test_script(
     *,
     cc_invocation: Command,
@@ -122,25 +171,15 @@ def write_test_script(
     if script_path.exists():
         double_check_removal_with_user(file=script_path, force_rm=force_rm)
 
-    output_target_idx = cc_invocation.index("-o") + 1
-    cc_invocation[output_target_idx] = target.name
-
-    cc_flags = "\n".join(
-        str(x) for x in cc_invocation[1:-4]
-    )  # exclude [clang/gcc] call and -o -c flags
-
-    target_flags = " ".join(
-        str(x) for x in cc_invocation[-4:]
-    )  # just -o target.o -c target.i
-
+    cc_flags = cc_invocation_to_flags(cc_invocation)
     flags_output_file = output_dir / Path("flags.txt")
-    flags_output_file.write_text(cc_flags)
-    success(f"Wrote {flags_output_file.name}")
+
+    write_flags_txt(cc_flags, flags_output_file)
 
     script_text = textwrap.dedent(
         f"""    #!/usr/bin/env bash
     CC_CMD() {{
-        {'clang' if uses_clang else 'gcc'} $(cat {flags_output_file.absolute()}) {'-Wfatal-errors' if go_fast else ''} {target_flags}
+        {'clang' if uses_clang else 'gcc'} $(cat {flags_output_file.absolute()}) {'-Wfatal-errors' if go_fast else ''} -c {target.with_suffix('.i').name}
     }}
     CC_CMD 2>&1 | grep "<your test here>"
     """
@@ -149,20 +188,14 @@ def write_test_script(
     script_path.write_text(script_text, encoding="utf-8")
 
     success(f"Successfully wrote {script_path}")
-    try:
-        script_path.chmod(0o755)
-        info(f"Added execute permissions to {script_path}")
-        todo(
-            "Now, modify the last line of test.sh with an interestingness test \n"
-            "that properly captures the behavior you're after. After that, "
-            "use test.sh with \nreduction tools like cvise.\n"
-            "Example Usage: $ cvise test.sh string.i"
-        )
-    except:
-        warn(
-            f"Couldn't change permissions of {script_path} to enable execution. "
-            "Do this manually."
-        )
+    script_path.chmod(0o755)
+    info(f"Added execute permissions to {script_path}")
+    todo(
+        "Now, modify the last line of test.sh with an interestingness test \n"
+        "that properly captures the behavior you're after. After that, "
+        "use test.sh with \nreduction tools like cvise.\n"
+        "Example Usage: $ cvise test.sh string.i"
+    )
 
 
 def double_check_removal_with_user(*, file: Path, force_rm: bool) -> None:
@@ -301,7 +334,7 @@ def main(cli_args: argparse.Namespace) -> None:
 
     ic(cli_args)
 
-    make_stdout = make_dot_i_file(
+    path_to_dot_i_file, make_stdout = make_dot_i_file(
         build_cmd=cli_args.build_command,
         target=cli_args.target,
         path_to_linux=cli_args.path_to_linux,
@@ -309,8 +342,9 @@ def main(cli_args: argparse.Namespace) -> None:
         force_rm_existing_target=cli_args.force_rm_existing_target,
     )
 
+    cleanup_dot_i_file(path_to_dot_i_file)
+
     cc_invocation = get_compiler_invocation(cli_args.target, make_stdout)
-    path_to_dot_i_file = cli_args.output / cli_args.target.name
     cc_invocation[
         -1
     ] = cli_args.target.name  # HACK: should search for .c instead of using -1
