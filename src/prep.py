@@ -259,7 +259,7 @@ def validate_cli_args(cli_args):
     validate_build_cmd_from_cli(cli_args.build_command)
 
 
-def is_kernel_configured_for_clang(path_to_linux: Path) -> Optional[bool]:
+def is_kernel_configured_for_clang(path_to_linux: Path) -> bool:
     """
     Find out what compiler to use based on what the kernel build system is
     currently configured for
@@ -295,8 +295,8 @@ def is_kernel_configured_for_clang(path_to_linux: Path) -> Optional[bool]:
 def main(cli_args: argparse.Namespace) -> None:
     validate_cli_args(cli_args=cli_args)
 
-    uses_clang: Optional[bool] = is_kernel_configured_for_clang(cli_args.path_to_linux)
-    assert uses_clang is not None
+    uses_clang = is_kernel_configured_for_clang(cli_args.path_to_linux)
+
     info(f"Using CC={'clang' if uses_clang else 'gcc'}")
 
     ic(cli_args)

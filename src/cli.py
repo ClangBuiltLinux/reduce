@@ -1,4 +1,4 @@
-import argparse
+from argparse import ArgumentTypeError
 from pathlib import Path
 from .types import Command
 
@@ -47,17 +47,11 @@ def validate_path_from_cli(
     Allow argparse to actually validate -p/--path-to-linux argument and
     provide helpful feedback
     """
-    try:
-        posix_path = Path(_path.strip())
-    except:
-        raise argparse.ArgumentTypeError(
-            f"Invalid {argument} argument provided: {_path} doesn't parse "
-            "into a PosixPath"
-        )
+    posix_path = Path(_path.strip())
 
     if not posix_path.is_dir():
         if not allow_mkdir:
-            raise argparse.ArgumentTypeError(
+            raise ArgumentTypeError(
                 f"Invalid {argument} argument provided: {_path} is not a "
                 "directory or it doesn't exist"
             )
@@ -84,10 +78,14 @@ def validate_target_from_cli(_target: str) -> Path:
 
 def validate_build_cmd_from_cli(build_cmd: Command) -> None:
     """
-    We need V=1 to find original compiler invocation
+    We need V=1 to find original compiler invocation.
+    If V=1 is not found, add it.
+
+    Also, don't allow user to provide target.i file as that is a separate arg
     """
     if "V=1" not in build_cmd:
-        raise RuntimeError("Need V=1 in your make build command")
+        info("Adding V=1 to build command")
+        build_cmd.append("V=1")
 
-    if any([".i" in str(part) for part in build_cmd]):  # cast is *necessary*
+    if any([str(part).endswith(".i") for part in build_cmd]):  # cast is *necessary*
         raise RuntimeError("Don't include the target .i file in your build command")

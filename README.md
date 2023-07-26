@@ -31,7 +31,7 @@ Currently, there are two scripts:
 
 > Or, try providing a custom build command
 >
-`$ reduce prep -p $LINUX -o $(mktemp -d) -- make -j8 LLVM=1 V=1 lib/string`
+`$ python reduce.py prep -p $LINUX -o $(mktemp -d) -- make -j8 LLVM=1 V=1 lib/string`
 
 
 
@@ -46,10 +46,3 @@ Currently, there are two scripts:
 
 > **Note**
 > Change your cwd to wherever `flags.txt` is located or try the `-p` option.
-
-
-
-## Contributions
-Author: Justin Stitt <justinstitt@google.com>
-
-Suggested-by: Nick Desaulniers <ndesaulniers@google.com>
