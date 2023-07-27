@@ -6,7 +6,6 @@ import shutil
 import subprocess
 import sys
 import textwrap
-from typing import Optional
 
 from icecream import ic
 
@@ -113,7 +112,10 @@ def clean_compiler_invocation(cc_invocation: Command) -> Command:
     """
 
     to_remove = ("-I", "-D", "-Wp", "-include", "-Werror", "./", "-U", "-E")
-    rules = [(lambda rule: lambda flag: rule not in flag)(rule) for rule in to_remove]
+    rules = [
+        (lambda rule: lambda flag: not flag.startswith(rule))(rule)
+        for rule in to_remove
+    ]
 
     cleaned = cc_invocation.copy()
     for rule in rules:
