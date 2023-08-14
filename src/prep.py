@@ -128,12 +128,9 @@ def clean_compiler_invocation(cc_invocation: Command) -> Command:
     return cleaned
 
 
-def cc_invocation_to_flags(cc_invocation: Command) -> str:
+def cc_invocation_to_flags(cc_invocation: Command, target: Path) -> str:
     """
     Accepts a full cc_invocation command and parses out just the flags
-
-    The order of the pop()'s are important as the relative index of items
-    changes as items are removed
     """
     cc_flags = cc_invocation[1:].copy()  # ditch the `clang` or `gcc` invocation
 
@@ -141,9 +138,10 @@ def cc_invocation_to_flags(cc_invocation: Command) -> str:
     cc_flags.pop(dash_o_idx + 1)  # remove target.o
     cc_flags.pop(dash_o_idx)  # remove -o
 
-    dash_c_idx = cc_flags.index("-c")
-    cc_flags.pop(dash_c_idx + 1)  # remove target.c
-    cc_flags.pop(dash_c_idx)  # remove -c
+    cc_flags.remove("-c")
+
+    adjusted_target = target.with_suffix(".i").name
+    cc_flags.remove(str(adjusted_target))
 
     return "\n".join([str(x) for x in cc_flags])  # cast is necessary for Paths
 
@@ -173,7 +171,7 @@ def write_test_script(
     if script_path.exists():
         double_check_removal_with_user(file=script_path, force_rm=force_rm)
 
-    cc_flags = cc_invocation_to_flags(cc_invocation)
+    cc_flags = cc_invocation_to_flags(cc_invocation, target)
     flags_output_file = output_dir / Path("flags.txt")
 
     write_flags_txt(cc_flags, flags_output_file)
@@ -194,14 +192,14 @@ def write_test_script(
     info(f"Added execute permissions to {script_path}")
     todo(
         "Now, modify the last line of test.sh with an interestingness test \n"
-        "that properly captures the behavior you're after. After that, "
-        "use test.sh with \nreduction tools like cvise.\n"
-        "Example Usage: $ cvise test.sh string.i"
+        "that properly captures the behavior you're after. \nAfter that, "
+        "run: \n$ python3 reduce.py code\n"
+        "Or, optionally, run cvise manually with: \n"
+        f"$ cvise test.sh {target.with_suffix('.i').name}"
     )
 
 
 def double_check_removal_with_user(*, file: Path, force_rm: bool) -> None:
-    # TODO: add optional rename
     while not force_rm:
         warning_msg = warn(
             f"target {file} already exists. Remove it? (y/n): ", ret_only=True
