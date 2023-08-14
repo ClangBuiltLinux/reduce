@@ -1,3 +1,5 @@
+import sys
+
 from argparse import ArgumentTypeError
 from pathlib import Path
 from .types import Command
@@ -18,7 +20,7 @@ class Colors:
 
 def error(msg: str) -> None:
     print(f"{Colors.FAIL}[ERROR]{Colors.ENDC} {msg}")
-    exit(1)
+    sys.exit(1)
 
 
 def warn(msg: str, ret_only: bool = False) -> str:

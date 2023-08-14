@@ -9,7 +9,7 @@
 import argparse
 import sys
 
-from src import flags, prep
+from src import flags, prep, code
 
 
 VERSION = "0.2.1"
@@ -47,8 +47,17 @@ def parse_cli_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     prep.setup_argparser(prep_parser)
-
     prep_parser.set_defaults(func=prep.main)
+
+    code_parser = subparsers.add_parser(
+        "code",
+        prog="prepreduce",
+        description=f"A script to reduce code using cvise",
+        epilog="Will use:\n\t$ cvise test.sh target.i\n",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    code.setup_argparser(code_parser)
+    code_parser.set_defaults(func=code.main)
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)

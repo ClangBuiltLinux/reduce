@@ -9,6 +9,9 @@ Currently, there are two scripts:
 2) flags
 > Minimize the compiler flags required to reproduce behavior. Use after prep
 
+3) code
+> Minimize a target `.i` file's source code using C-Vise. Use after prep
+
 ## Dependencies
 * Python 3.11
 * [icecream](https://pypi.org/project/icecream/)
@@ -46,3 +49,11 @@ Currently, there are two scripts:
 
 > **Note**
 > Change your cwd to wherever `flags.txt` is located or try the `-p` option.
+
+### code
+> Minimize a `.i` file after using `prep` and, preferably, `flags`
+
+> **Note**
+> This script simply wraps C-Vise and will yield better results based on how good your interestingness test is
+
+`$ python reduce.py code`
